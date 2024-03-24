@@ -1,6 +1,6 @@
 
 The current project page provides pytorch code that implements the following paper:
-# Fuzzy Logic Visual Network (FLVN): A neuro-symbolic approach for visual features matching
+# Fuzzy Logic Prototypical Network (FLPN): A neuro-symbolic approach for visual prototypes matching
 ## Authors: Francesco Manigrasso, Lia Morra, Fabrizio Lamberti
 ## Abstract:
 From the beginning of zero-shot learning research, visual attributes have been shown to play an important role. In order to better transfer attribute-based knowledge from known to unknown classes, we argue that an image representation with integrated attribute localization ability would be beneficial for zero-shot learning. To this end, we propose a novel zero-shot representation learning framework that jointly learns discriminative global and local features using only class-level attributes. While a visual-semantic embedding layer learns global features, local features are learned through an attribute prototype network that simultaneously regresses and decorrelates attributes from intermediate features. We show that our locality augmented image representations achieve a new state-of-the-art on three zero-shot learning benchmarks. As an additional benefit, our model points to the visual evidence of the attributes in an image, e.g. for the CUB dataset, confirming the improved attribute localization ability of our image representation.
@@ -43,8 +43,6 @@ If you make use of the dataset in your research, please cite our paper:
 
 Manigrasso Francesco ,Morra Lia, Lamberti Fabrizio,
 "Fuzzy Logic Visual Network (FLVN): A neuro-symbolic approach for visual features matching", 22nd International Conference on IMAGE ANALYSIS AND PROCESSING.
-
-
 
 
 

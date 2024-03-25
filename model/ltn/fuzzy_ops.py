@@ -2388,7 +2388,7 @@ class Focalloss(AggregationOperator):
         """
         p = self.p if p is None else p
         stable = self.stable if stable is None else stable
-
+        xs = xs + 1e-6
 
         if mask is not None:
             if mask.shape != xs.shape:

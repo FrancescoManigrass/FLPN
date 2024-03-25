@@ -516,10 +516,14 @@ class resnet_proto_IoU(nn.Module):
         self.Exists = ltn.Quantifier(ltn.fuzzy_ops.AggregPMean(p=2), quantifier="e")
         if opt.focalloss:
             self.Forall = ltn.Quantifier(ltn.fuzzy_ops.Focalloss(p=2, stable=True), quantifier="f")
+            self.ForallSum = ltn.Quantifier(ltn.fuzzy_ops.AggregSum(), quantifier="f")
+            self.SatAgg = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregSum())
         else:
             self.Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(p=2, stable=True), quantifier="f")
+            self.ForallSum = self.Forall
+            self.SatAgg = ltn.fuzzy_ops.SatAgg()
 
-        self.SatAgg = ltn.fuzzy_ops.SatAgg()
+
         self.Not = ltn.Connective(ltn.fuzzy_ops.NotStandard())
         self.Equiv = ltn.Connective(ltn.fuzzy_ops.Equiv(ltn.fuzzy_ops.AndProd(), ltn.fuzzy_ops.ImpliesReichenbach()))
         self.Implies = ltn.Connective(ltn.fuzzy_ops.ImpliesKleeneDienes())
@@ -776,7 +780,7 @@ class resnet_proto_IoU(nn.Module):
             # ATTRIBUTI NUOVO
             if opt.sat_agg_same_attribute:
                 if attribute_features.value.shape[0] != 0:
-                    sat_agg_same_attribute = self.Forall(
+                    sat_agg_same_attribute = self.ForallSum(
                         ltn.diag(attribute_features, index_of_attribute_x),
                         self.Forall(
                             ltn.diag(att_proto, index_of_attribute_y),
@@ -789,7 +793,7 @@ class resnet_proto_IoU(nn.Module):
                     my_dict["sat_agg_same_attribute"] = sat_agg_same_attribute
 
             if opt.sat_agg_macroclass_implied:
-                sat_agg_macroclass_implied = self.Forall(
+                sat_agg_macroclass_implied = self.ForallSum(
                     ltn.diag(x_global_macroclass, label_x_macroclass_proto),
                     self.Forall(
                         ltn.diag(images_x_features, images_x, label_x_m, label_x),
@@ -801,9 +805,9 @@ class resnet_proto_IoU(nn.Module):
                 )
                 my_dict["sat_agg_macroclass_implied"] = sat_agg_macroclass_implied
             if opt.sat_agg_class_cluster_greater:
-                sat_agg_class_cluster_greater = self.Forall(
+                sat_agg_class_cluster_greater = self.ForallSum(
                     ltn.diag(images_x_features, images_x),
-                    self.Forall(
+                    self.ForallSum(
                         ltn.diag(images_y_features, images_y),
                         self.Forall(
                             label_classes,
@@ -818,9 +822,9 @@ class resnet_proto_IoU(nn.Module):
 
             # 0.7
             if opt.sat_agg_class_cluster_lower:
-                sat_agg_class_cluster_lower = self.Forall(
+                sat_agg_class_cluster_lower = self.ForallSum(
                     ltn.diag(images_x_features, images_x),
-                    self.Forall(
+                    self.ForallSum(
                         ltn.diag(images_y_features, images_y),
                         self.Forall(
                             label_classes,
@@ -855,9 +859,15 @@ class resnet_proto_IoU(nn.Module):
 
             """
 
-            return -torch.log((self.SatAgg(
-                my_dict.values(),
-                p=axioms_options["p_all"]))), my_dict
+
+            if opt.focalloss:
+                return self.SatAgg(
+                    my_dict.values(),
+                    p=axioms_options["p_all"]), my_dict
+            else:
+                return -torch.log(self.SatAgg(
+                    my_dict.values(),
+                    p=axioms_options["p_all"])), my_dict
 
 
 

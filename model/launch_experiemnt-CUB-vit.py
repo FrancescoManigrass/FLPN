@@ -5,7 +5,7 @@ import random
 
 random.seed(42)
 
-subprocess.run("python model/main.py --dataset CUB --cuda --nepoch 100 --pretrain_epoch 4 "
+subprocess.run("python model/main.py --dataset CUB --cuda --nepoch 100 --pretrain_epoch 0 "
                " --pretrain_lr 1e-4 --classifier_lr 1e-7 --manualSeed 3131 --avg_pool "
                " --batch_size 16 --calibrated_stacking 0.7 --all --gzsl  --axioms_exists "
                " --weight_exists --weight_isofclass "

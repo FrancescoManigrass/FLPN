@@ -20,4 +20,6 @@ plt.ylabel('Frequenza')
 # Mostra il grafico
 plt.xticks(rotation=45)
 plt.tight_layout()
+
+plt.savefig("awa2_distribution.pdf")
 plt.show()

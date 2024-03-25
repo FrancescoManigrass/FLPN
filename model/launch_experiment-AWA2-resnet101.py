@@ -12,7 +12,7 @@ subprocess.run("python model/main.py --dataset AWA2 --cuda --nepoch 20 --pretrai
                " --neptune_flag --p 1"
                ,shell=True)
 
-"""
+
 subprocess.run("python model/main.py --dataset AWA2 --cuda --nepoch 20 --pretrain_epoch 0 "
                " --pretrain_lr 1e-4 --classifier_lr 1e-3 --manualSeed 8275 --avg_pool "
                " --batch_size 64 --calibrated_stacking 0.7 --all --gzsl  --axioms_exists "
@@ -50,7 +50,7 @@ subprocess.run("python model/main.py --dataset AWA2 --cuda --nepoch 20 --pretrai
 
 
 
-
+"""
 subprocess.run("python model/main.py --dataset AWA2 --cuda --nepoch 30 --pretrain_epoch 0 "
                " --pretrain_lr 1e-4 --classifier_lr 1e-3 --manualSeed 8275 --avg_pool "
                " --batch_size 64 --calibrated_stacking 0.7 --all --gzsl  --axioms_exists "
@@ -60,7 +60,7 @@ subprocess.run("python model/main.py --dataset AWA2 --cuda --nepoch 30 --pretrai
                 " --sat_agg_same_attribute"
                " --sat_agg_macroclass_implied"
                " --sat_agg_class_cluster_greater --sat_agg_class_cluster_lower"
-               " --sat_agg_class_global --neptune_flag --p 1", shell=True)
+               " --sat_agg_class_global --p 1", shell=True)
 
 
 

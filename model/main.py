@@ -17,7 +17,7 @@ import sys
 import random
 
 from custom_transformations import crop_images
-from ViT import ViT
+
 
 from neptune_logging import log_loss_training
 from visual_utils import ImageFilelist, compute_per_class_acc, compute_per_class_acc_gzsl, \
@@ -68,8 +68,13 @@ def main():
         torch.cuda.set_device(device)
     if opt.logltn:
         from model_proto_log_ltn import resnet_proto_IoU
+        from Vit_log_ltn import ViT
+
     else:
         from model_proto import resnet_proto_IoU
+        from ViT import ViT
+
+
     opt.device = device
 
     # load data

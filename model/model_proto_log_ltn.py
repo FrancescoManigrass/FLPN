@@ -394,6 +394,7 @@ class resnet_proto_IoU(nn.Module):
             label_x_macroclass_proto = ltn.Variable("label_x_macroclass_proto", self.data.seen_macroclass)
             x_global_macroclass = ltn.Variable("x_global_macroclass", macroclass_proto)
 
+
             label_x_m = ltn.Variable("label_x_m =", label_m)
             images_x_features = ltn.Variable("images_x_features", F.normalize(pre_attri['final'], dim=-1))
             images_y_features = ltn.Variable("images_y_features", F.normalize(pre_attri['final'], dim=-1))

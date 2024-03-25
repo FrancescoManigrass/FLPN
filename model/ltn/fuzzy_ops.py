@@ -2346,6 +2346,8 @@ class Focalloss(AggregationOperator):
         """
         self.p = p
         self.stable = stable
+        self.alpha = 1
+        self.gamma = 1
 
     def __repr__(self):
         return "AggregPMeanError(p=" + str(self.p) + ", stable=" + str(self.stable) + ")"
@@ -2398,10 +2400,15 @@ class Focalloss(AggregationOperator):
             non_zero_values = masked != 0
             zeros = torch.zeros_like(xs)
             zeros[non_zero_values]=torch.log(xs[non_zero_values])
-            return -( torch.sum(1-masked,dim=dim, keepdim=keepdim) * torch.sum(zeros,dim=dim, keepdim=keepdim) )
+
+
+
+
+
+            return -self.alpha *torch.sum(torch.mul(torch.pow((1 - masked),self.gamma),zeros),dim=dim, keepdim=keepdim)
 
         else:
-            return  -(torch.sum(1-xs,dim=dim, keepdim=keepdim) * torch.sum(xs,dim=dim, keepdim=keepdim) )
+            return -self.alpha * torch.sum(torch.mul(torch.pow((1 - xs),self.gamma),torch.log(xs)),dim=dim, keepdim=keepdim)
 
 
 

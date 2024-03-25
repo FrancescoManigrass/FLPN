@@ -22,21 +22,8 @@ From the beginning of zero-shot learning research, visual attributes have been s
 
 - AWA2
 ```sh
-$ python main.py python ./model/main.py --dataset AWA2 --cuda --nepoch 30 --pretrain_epoch 2 --pretrain_lr 1e-4 --classifier_lr 1e-7 --manualSeed 7048 \
---xe 1 --attri 1e-4 --regular 0.0005 --l_xe 1 --l_attri 1e-2 --l_regular 0.5e-6 --cpt 2e-9 --avg_pool --batch_size 64 --calibrated_stacking 0.7 --all --gzsl  --c 0.01
+$ python main.py python ./model/main.py --dataset AWA2 --cuda --nepoch 300 --pretrain_epoch 0 --pretrain_lr 1e-2 --classifier_lr 1e-3 --manualSeed 3131 --avg_pool --batch_size 32 --calibrated_stacking 0.7 --all --gzsl --axioms_exists --weight_exists --weight_isofclass --ways 12 --shots 12 --workers 4 --model resnet101 --gpu 0 --sat_agg_class --sat_agg_class_outlier_exists --sat_agg_same_attribute --sat_agg_macroclass_implied --sat_agg_class_cluster_greater --sat_agg_class_cluster_lower --scale 50.0 --k 15 --optimizer sgd --p 1 --focalloss
 ```
-- CUB
-```sh
-$ python main.py python ./model/main.py --dataset CUB --calibrated_stacking 0.7 --cuda --nepoch 30 --batch_size 64 --train_id 0 --manualSeed 3131 --pretrain_epoch 5  \
---pretrain_lr 1e-4 --classifier_lr 1e-6 --xe 1 --attri 1e-2 --regular 5e-5 --l_xe 1 --l_attri 1e-1  --l_regular 4e-2 --cpt 1e-9 --use_group --gzsl --c 1```
-```
-
-- SUN
-```sh
-$ python main.py python ./model/main.py --calibrated_stacking 0.4 --dataset SUN --cuda --nepoch 30 --pretrain_epoch 4 --pretrain_lr 1e-3  \ 
---classifier_lr 1e-6 --manualSeed 2347 --xe 1 --attri 1e-4 --regular 1e-3 --l_xe 1 --l_attri 5e-2 --l_regular 5e-3  --avg_pool --use_group --cpt 2e-7 --gzsl   --c 1
-```
-
 # Citation
 
 If you make use of the dataset in your research, please cite our paper:

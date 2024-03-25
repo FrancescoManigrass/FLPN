@@ -87,6 +87,8 @@ def get_opt():
     parser.add_argument('--transform_complex', action='store_true', default=False, help='complex transform')
     # additional for SUN and AWA
     parser.add_argument('--awa_finetune', action='store_true', default=False)
+    parser.add_argument('--logltn', action='store_true', default=False)
+    parser.add_argument('--focalloss', action='store_true', default=False)
     parser.add_argument('--use_group', action='store_true', default=False)
     parser.add_argument('--avg_pool', action='store_true', default=False)
     parser.add_argument('--avg_pool_part', action='store_true', default=False)

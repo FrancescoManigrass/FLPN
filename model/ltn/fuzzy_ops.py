@@ -2281,7 +2281,128 @@ class Not_log_negation_softmax(UnaryConnectiveOperator):
         return "Not_log_negation_softmax()"
 
     def __call__(self, x):
+        log_expr_tensor = torch.clamp(x, min=0.001, max=0.99)
 
-       return torch.log(1-torch.exp(x))
+        return torch.log(1-log_expr_tensor)
+
+
+
+class Focalloss(AggregationOperator):
+    """
+    `pMeanError` fuzzy aggregation operator.
+
+    :math:`A_{pME}(x_1, \\dots, x_n) = 1 - (\\frac{1}{n} \\sum_{i = 1}^n (1 - x_i)^p)^{\\frac{1}{p}}`
+
+    Parameters
+    ----------
+    p : :obj:`int`, default=2
+        Value of hyper-parameter `p` of the `pMeanError` fuzzy aggregation operator.
+    stable : :obj:`bool`, default=True
+        Flag indicating whether to use the :ref:`stable version <stable>` of the operator or not.
+
+    Attributes
+    ----------
+    p : :obj:`int`
+        See `p` parameter.
+    stable : :obj:`bool`
+        See `stable` parameter.
+
+    Notes
+    -----
+    The `pMeanError` aggregation operator has been selected as an approximation of
+    :math:`\\forall` with :math:`p \geq 1`. If :math:`p \\to \infty`, then the `pMeanError` operator tends to the
+    minimum of the input values (classical behavior of :math:`\\forall`).
+
+    Examples
+    --------
+    >>> import ltn
+    >>> import torch
+    >>> Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(), quantifier='f')
+    >>> print(Forall)
+    Quantifier(agg_op=AggregPMeanError(p=2, stable=True), quantifier='f')
+    >>> p = ltn.Predicate(func=lambda x: torch.nn.Sigmoid()(
+    ...                                     torch.sum(x, dim=1)
+    ...                                  ))
+    >>> x = ltn.Variable('x', torch.tensor([[0.56], [0.9], [0.7]]))
+    >>> print(p(x).value)
+    tensor([0.6365, 0.7109, 0.6682])
+    >>> print(Forall(x, p(x)).value)
+    tensor(0.6704)
+
+    .. automethod:: __call__
+    """
+
+    def __init__(self, p=2, stable=True):
+        """
+        This constructor has to be used to set whether it has to be used the stable version (it avoids gradient
+        problems) of the p-mean error aggregator or not. Also, it is possible to set the value of the parameter p.
+
+        Parameters
+        ----------
+        p: :obj:`int`
+            Value of the parameter p.
+        stable: :obj:`bool`
+            A boolean flag indicating whether it has to be used the stable version of the aggregator or not.
+        """
+        self.p = p
+        self.stable = stable
+
+    def __repr__(self):
+        return "AggregPMeanError(p=" + str(self.p) + ", stable=" + str(self.stable) + ")"
+
+    def __call__(self, xs, dim=None, keepdim=False, mask=None, p=None, stable=None):
+        """
+        It applies the `pMeanError` aggregation operator to the given formula's :ref:`grounding <notegrounding>`
+        on the selected dimensions.
+
+        Parameters
+        ----------
+        xs : :class:`torch.Tensor`
+            :ref:`Grounding <notegrounding>` of formula on which the aggregation has to be performed.
+        dim : :obj:`tuple` of :obj:`int`, default=None
+            Tuple containing the indexes of dimensions on which the aggregation has to be performed.
+        keepdim : :obj:`bool`, default=False
+            Flag indicating whether the output has to keep the same dimensions as the input after
+            the aggregation.
+        mask : :class:`torch.Tensor`, default=None
+            Boolean mask for excluding values of 'xs' from the aggregation. It is internally used for guarded
+            quantification. The mask must have the same shape of 'xs'. `False` means exclusion, `True` means inclusion.
+        p : :obj:`int`, default=None
+            Value of hyper-parameter `p` of the `pMeanError` fuzzy aggregation operator.
+        stable: :obj:`bool`, default=None
+            Flag indicating whether to use the :ref:`stable version <stable>` of the operator or not.
+
+        Returns
+        ----------
+        :class:`torch.Tensor`
+            `pMeanError` fuzzy aggregation of the formula.
+
+        Raises
+        ------
+        :class:`ValueError`
+            Raises when the :ref:`grounding <notegrounding>` of the formula ('xs') and the mask do not have the same
+            shape.
+            Raises when the 'mask' is not boolean.
+        """
+        p = self.p if p is None else p
+        stable = self.stable if stable is None else stable
+
+
+        if mask is not None:
+            if mask.shape != xs.shape:
+                raise ValueError("'xs' and 'mask' must have the same shape.")
+            if not mask.dtype == torch.bool:  # isinstance(mask, torch.BoolTensor):
+                raise ValueError("'mask' must be a torch.BoolTensor.")
+
+            masked = torch.where(~mask, torch.zeros_like(xs), xs)
+            non_zero_values = masked != 0
+            zeros = torch.zeros_like(xs)
+            zeros[non_zero_values]=torch.log(xs[non_zero_values])
+            return -( torch.sum(1-masked,dim=dim, keepdim=keepdim) * torch.sum(zeros,dim=dim, keepdim=keepdim) )
+
+        else:
+            return  -(torch.sum(1-xs,dim=dim, keepdim=keepdim) * torch.sum(xs,dim=dim, keepdim=keepdim) )
+
+
 
 

@@ -24,7 +24,7 @@ from visual_utils import ImageFilelist, compute_per_class_acc, compute_per_class
     prepare_attri_label, add_glasso, add_dim_glasso
 from logger import Logger
 # from utils import init_log
-from model_proto import resnet_proto_IoU
+
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -61,12 +61,15 @@ if opt.cuda:
 
 def main():
     if opt.accelerator:
-
         device  = accelerator.device
 
     else:
         device = "cuda:"+opt.gpu
         torch.cuda.set_device(device)
+    if opt.logltn:
+        from model_proto_log_ltn import resnet_proto_IoU
+    else:
+        from model_proto import resnet_proto_IoU
     opt.device = device
 
     # load data
@@ -167,11 +170,6 @@ def main():
 
 
 
-    #layer_name = model.extract[0]  # only use one layer currently
-    # compact loss configuration, define middle_graph
-    # middle_graph = get_middle_graph(reg_weight[layer_name]['cpt'], model)
-
-    # train and test
 
     result_gzsl_student = Result()
     result_zsl_student = Result()
@@ -283,15 +281,15 @@ def main():
             attribute_gzsl = torch.transpose(class_attribute, 1, 0)
             attribute_gzsl_original = torch.transpose(class_attribute_original, 1, 0)
 
-            if  True:
-                attribute_zsl = attribute_zsl.to(opt.device)
-                attribute_seen = attribute_seen.to(opt.device)
-                attribute_macroclass_seen = attribute_macroclass_seen.to(opt.device)
-                attribute_gzsl = attribute_gzsl.to(opt.device)
-                model.binary_att = model.binary_att.to(opt.device)
-                model.parts_key = model.parts_key.to(opt.device)
-                model.parts = model.parts.to(opt.device)
-                attribute_seen_original = attribute_seen_original.to(opt.device)
+
+            attribute_zsl = attribute_zsl.to(opt.device)
+            attribute_seen = attribute_seen.to(opt.device)
+            attribute_macroclass_seen = attribute_macroclass_seen.to(opt.device)
+            attribute_gzsl = attribute_gzsl.to(opt.device)
+            model.binary_att = model.binary_att.to(opt.device)
+            model.parts_key = model.parts_key.to(opt.device)
+            model.parts = model.parts.to(opt.device)
+            attribute_seen_original = attribute_seen_original.to(opt.device)
 
             print("init dataloader")
             # Dataloader for train, test, visual
@@ -372,91 +370,6 @@ def main():
                                              axioms_options=axioms_options, opt=opt, extract_bb=True,
                                              original_attribute=attribute_seen_original, paths=impath)
 
-                    if opt.cropped_image:
-                        # print(datetime.now() - start_time)
-                        cropped_images = crop_images(input_v, boxes, opt)
-
-                        if opt.print_images:
-                            print("-------- printing images-------------")
-                            paths = [os.path.split(f)[-1] for f in impath]
-                            os.makedirs("output_images", exist_ok=True)
-                            for k in range(len(boxes)):
-                                folder = paths[k].split("_")[0]
-                                name_image = paths[k].split("_")[1]
-
-                                os.makedirs(join("output_images", folder), exist_ok=True)
-
-                                image = Image.open(
-                                    opt.image_root + "/" + opt.dataset + "/" + "JPEGImages" + "/"
-                                    + folder + "/" + folder + "_" + name_image)
-
-                                image = image.resize((224, 224))
-
-                                cropped_img = image.crop(
-                                    (int(boxes[0][0]), int(boxes[0][1]), int(boxes[0][2]), int(boxes[0][3])))
-                                cropped_img.save(f'output_images/{folder}/{folder}_{name_image}')
-
-                                """
-                                fig = plt.figure()
-                                plt.imshow(cropped_images[k][0, :].cpu().detach().numpy())
-                                # plt.show()
-                                folder = paths[k].split("_")[0]
-                                name_image =  paths[k].split("_")[1]
-                                os.makedirs(join("output_images",folder),exist_ok=True)
-                                fig.savefig(f'output_images/{folder}/{name_image}', dpi=fig.dpi)
-
-                                """
-                                """
-
-                                fig = plt.figure()
-                                plt.imshow(input_v[k][0, :].cpu().detach().numpy())
-                                # plt.show()
-                                fig.savefig(f'output_images/{k}_original.png', dpi=fig.dpi)
-                                """
-
-                        if opt.cuda:
-                            cropped_images = cropped_images
-                        # print(datetime.now() - start_time)
-
-                        pre_attri, boxes = model(cropped_images, attribute=attribute_seen, label=label_v,
-                                                 label_m=label_m, attribute_macroclass_seen=attribute_macroclass_seen,
-                                                 axioms_options=axioms_options, opt=opt,
-                                                 original_attribute=attribute_seen_original, paths=paths)
-
-                        # print(datetime.now() - start_time)
-
-                    def print_features(t, j, data):
-                        paths = [os.path.split(f)[-1] for f in impath]
-
-                        for k in range(pre_attri["part_attention"].shape[0]):
-
-                            os.makedirs("features", exist_ok=True)
-                            folder = paths[k].split("_")[0]
-                            name_image = paths[k].split("_")[1]
-
-                            os.makedirs(join("output_images", folder), exist_ok=True)
-
-                            image = Image.open(
-                                opt.image_root + "/" + opt.dataset + "/" + "JPEGImages" + "/"
-                                + folder + "/" + folder + "_" + name_image)
-
-                            image = image.resize((224, 224))
-                            fig = plt.figure(figsize=(7, 7))
-
-                            plt.imshow(image)
-                            fig.savefig(f'features/{name_image}.png', dpi=fig.dpi)
-                            part_index = 0
-                            for i in range(pre_attri["part_attention"].shape[1]):
-                                features = pre_attri["part_attention"][k][i].view(7, 7)
-                                fig = plt.figure(figsize=(7, 7))
-                                features = features.cpu().detach().numpy()
-                                plt.imshow(features)
-                                fig.savefig(f'features/{name_image}_{data.attri_name[part_index]}.png', dpi=fig.dpi)
-                                part_index += 1
-
-                    if opt.print_images:
-                        print_features(0, 36, data)
-
 
 
 
@@ -465,22 +378,12 @@ def main():
                                                                attribute_macroclass_seen=attribute_macroclass_seen,
                                                                axioms_options=axioms_options, opt=opt,
                                                                labels_test=data.seenclasses,
-                                                               original_attribute=attribute_seen_original,epoch=epoch)
+                                                               original_attribute=attribute_seen_original)
 
                     # print(datetime.now() - start_time)
                     if hasattr(torch.cuda, 'empty_cache'):
                         torch.cuda.empty_cache()
 
-                    label_a = attribute_seen[:, label_v].t()
-
-                    alpha = -23
-                    beta = -18
-                    mu = 1 / (7 * 7)
-                    # loss1 = torch.exp(alpha * (torch.max(pre_attri["map_attention"], dim=1)[0] + beta * mu))
-                    # loss1 = torch.sum(loss1) / loss1.shape[0]
-
-                    # loss2 = torch.exp(alpha * (torch.max(pre_attri["map_attention_cropped"], dim=1)[0] + beta * mu))
-                    # loss2 = torch.sum(loss2) / loss2.shape[0]
 
                     loss_log['ave_loss'] += loss.item()  # + loss1.item() + loss2.item()
                     for f in list_axioms.keys():
@@ -502,17 +405,11 @@ def main():
                         log_loss_training(opt, loss_log, step)
 
                     global_step += 1
-                    # print("finished")
-                    #del input_v
-                    #del boxes
-                    #del pre_attri
                     torch.cuda.empty_cache()
 
-            # print('\nLoss log: {}'.format({key: loss_log[key] / batch for key in loss_log}))
+
             print('\n[Epoch %d, Batch %5d] Train loss: %.3f ' % (epoch + 1, batch, loss_log['ave_loss'] / batch))
-            # logger.scalar_summary('Train loss', loss_log['ave_loss'] / batch, epoch+1)
-            # logger.scalar_summary('Train contrastive loss', loss_log['contrastive_loss'] / batch, epoch+1)
-            # logger.scalar_summary('Train consistency loss', loss_log['consistency_loss'] / batch, epoch+1)
+
             axioms_log = {'zsl': 0, 'top1_seen': 0, 'top1_unseen': 0, "H_gzsl": 0}
             if (i + 1) == batch:  # or epoch % 200 == 0
                 ###### test #######

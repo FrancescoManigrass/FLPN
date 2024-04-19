@@ -4,7 +4,7 @@ import argparse
 def get_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', default='AWA2', help='FLO, CUB')
-    parser.add_argument('--optimizer', default='adam', help='adam, sgd')
+    parser.add_argument('--optimizer', default='sgd', help='adam, sgd')
     parser.add_argument('--model', help='resnet, vit')
     parser.add_argument('--root', default='data/wgr/code/APN-ZSL-master/', help='path to project')
     parser.add_argument('--image_root', default='data/wgr/code/APN-ZSL-master/data', type=str, metavar='PATH',
@@ -44,6 +44,7 @@ def get_opt():
                         help='image_type to visualize, usually test_unseen_small_loc, test_unseen_loc, test_seen_loc')
     parser.add_argument('--pretrain_epoch', type=int, default=5)
     parser.add_argument('--scale', type=float, default=25.0)
+    parser.add_argument('--scale_fake', type=float, default=25.0)
     parser.add_argument('--size', type=int, default=224)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
     parser.add_argument('--pretrain_lr', type=float, default=1e-4, help='learning rate to pretrain model')
@@ -81,7 +82,7 @@ def get_opt():
 
     # for distributed loader
     parser.add_argument('--train_mode', type=str, default='random', help='loader: random or distributed or ltnsampler')
-    parser.add_argument('--n_batch', type=int, default=1000, help='batch numbers per epoch')
+    parser.add_argument('--n_batch', type=int, default=300, help='batch numbers per epoch')
     parser.add_argument('--false_negative', type=int, default=15, help='batch numbers per epoch')
     parser.add_argument('--ways', type=int, default=16, help='class numbers per episode')
     parser.add_argument('--shots', type=int, default=2, help='image numbers per class')
@@ -100,7 +101,7 @@ def get_opt():
     parser.add_argument('--only_evaluate', action='store_true', default=False)
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--resume_path',
-                        default='C:\\Users\\lab2O\\Documents\\Francesco Manigrasso\\polito\\flvn_official_extended\\out\\weight\\alpha\\pretrainepoch4_pretrainlr0.0001_classifierlr1e-07_8ways-12shots-1/Experiment(NEW-1298)_AWA2_student_GZSL_id_0.pth',
+                        default='C:\\Users\\lab2O\\Documents\\Francesco Manigrasso\\polito\\flvn_official_extended\\out\\weight\\alpha\\pretrainepoch0_pretrainlr0.001_classifierlr0.001_16ways-2shots-1/Experiment(NEW-2871)_SUN__ZSL_id_0.pth',
                         help='weights resume missed')
 
     parser.add_argument('--neptune_flag', action='store_true', default=False)

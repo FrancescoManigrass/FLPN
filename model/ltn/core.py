@@ -860,7 +860,7 @@ class Function(nn.Module):
     def __repr__(self):
         return "Function(model=" + str(self.model) + ")"
 
-    def forward(self, *inputs, **kwargs):
+    def forward(self, *inputs,log=False, **kwargs):
         """
         It computes the output of the function given some :ref:`LTN objects <noteltnobject>` in input.
 
@@ -894,7 +894,10 @@ class Function(nn.Module):
 
         output = torch.reshape(output, tuple(output_shape + list(output.shape[1::])))
 
-        output = output.float()
+        if log:
+            output = torch.log(output.float()+1e-6)
+        else:
+            output = output.float()
 
         return LTNObject(output, output_vars)
 

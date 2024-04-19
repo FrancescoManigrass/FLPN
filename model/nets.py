@@ -69,7 +69,7 @@ class ClassStandardization(nn.Module):
 
 
 class ProtoModel(nn.Module):
-    def __init__(self, attr_dim: int, hid_dim: int, proto_dim: int, with_cn: bool):
+    def __init__(self, attr_dim: int, hid_dim: int, proto_dim: int, with_cn: bool,opt:None):
         super().__init__()
         self.fc1 = nn.Linear(attr_dim, hid_dim)
         self.relu1 = nn.ReLU()
@@ -77,34 +77,40 @@ class ProtoModel(nn.Module):
         if with_cn:
             self.cn1 = ClassStandardization(hid_dim)
             self.cn1_att = ClassStandardization(hid_dim)
-            self.cn1_macro = ClassStandardization(hid_dim)
+            if opt.dataset != "SUN":
+                self.cn1_macro = ClassStandardization(hid_dim)
 
         else:
             self.cn1 = nn.Identity()
             self.cn1_att = nn.Identity()
-            self.cn1_macro = nn.Identity()
+            if opt.dataset != "SUN":
+                self.cn1_macro = nn.Identity()
         self.relu2 = nn.ReLU()
         if with_cn:
             self.cn2 = ClassStandardization(hid_dim)
             self.cn2_att = ClassStandardization(hid_dim)
-            self.cn2_macro = ClassStandardization(hid_dim)
+            if opt.dataset != "SUN":
+                self.cn2_macro = ClassStandardization(hid_dim)
 
         else:
             self.cn2 = nn.Identity()
             self.cn2_att = nn.Identity()
-            self.cn2_macro = nn.Identity()
+            if opt.dataset != "SUN":
+                self.cn2_macro = nn.Identity()
 
 
         self.fc3 = nn.Linear(hid_dim, proto_dim)
         self.fc3_att = nn.Linear(hid_dim, proto_dim)
-        self.fc3_macro = nn.Linear(hid_dim, proto_dim)
+        if opt.dataset != "SUN":
+            self.fc3_macro = nn.Linear(hid_dim, proto_dim)
         self.relu3 = nn.ReLU()
         if USE_PROPER_INIT:
             weight_var = 1 / (hid_dim * proto_dim)
             b = np.sqrt(3 * weight_var)
             self.fc3.weight.data.uniform_(-b, b)
             self.fc3_att.weight.data.uniform_(-b, b)
-            self.fc3_macro.weight.data.uniform_(-b, b)
+            if opt.dataset != "SUN":
+                self.fc3_macro.weight.data.uniform_(-b, b)
 
         nn.init.xavier_uniform_(self.fc1.weight)
         nn.init.xavier_uniform_(self.fc2.weight)

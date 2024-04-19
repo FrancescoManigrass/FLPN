@@ -43,6 +43,38 @@ class Result(object):
             self.best_acc_S = acc_s
 
 
+class CategoriesSampler2():
+
+    def __init__(self, label_for_imgs, n_batch, n_cls, n_per, ep_per_batch=1):
+        self.n_batch = n_batch # batchs for each epoch
+        self.n_cls = n_cls # ways
+        self.n_per = n_per # shots
+        self.ep_per_batch = ep_per_batch # episodes for each batch, defult set 1
+
+        self.cat =  list(np.unique(label_for_imgs))
+        self.catlocs = {}
+
+        for c in self.cat:
+            self.catlocs[c] = np.argwhere(label_for_imgs == c).reshape(-1)
+
+
+    def __len__(self):
+        return  self.n_batch
+
+    def __iter__(self):
+        for i_batch in range(self.n_batch):
+            batch = []
+            for i_ep in range(self.ep_per_batch):
+                episode = []
+                selected_classes = np.random.choice(self.cat, self.n_cls, replace=False)
+
+                for c in selected_classes:
+                    l = np.random.choice(self.catlocs[c], self.n_per, replace=False)
+                    episode.append(torch.from_numpy(l))
+                episode = torch.stack(episode)
+                batch.append(episode)
+            batch = torch.stack(batch)  # bs * n_cls * n_per
+            yield batch.view(-1)
 class CategoriesSampler():
     # migrated from Liu et.al., which works well for CUB dataset
     def __init__(self, label_for_imgs, batch_size=1000, n_cls=16, n_per=3, ep_per_batch=1):
@@ -128,8 +160,8 @@ def test_zsl(opt, model, testloader, attribute, test_classes,attribute_original)
         for i, (input, target, impath) in \
                 enumerate(testloader):
             if opt.cuda:
-                input = input.to(torch.device("cuda:"+opt.gpu))
-                target = target.to(torch.device("cuda:"+opt.gpu))
+                input = input.to(torch.device(opt.device))
+                target = target.to(torch.device(opt.device))
             #output = model(input, attribute,get_prediction=True,opt=opt)
             pre_attri, boxes = model(input, attribute=attribute,opt=opt, extract_bb=True)
 
@@ -146,7 +178,7 @@ def test_zsl(opt, model, testloader, attribute, test_classes,attribute_original)
 
                 cropped_images = torch.stack(cropped_images)
                 if opt.cuda:
-                    cropped_images = cropped_images.to(torch.device("cuda:"+opt.gpu))
+                    cropped_images = cropped_images.to(torch.device(opt.device))
 
                 pre_attri, boxes = model(cropped_images, attribute=attribute, opt=opt)
 
@@ -180,8 +212,12 @@ def calibrated_stacking(opt, output, lam=1e-3):
     self.test_unseen_label
     :return
     """
+
+
     output = output.cpu().numpy()
     seen_L = list(set(opt.test_seen_label.numpy()))
+    #print(lam)
+    #print(output[:, seen_L])
     output[:, seen_L] = output[:, seen_L] - lam
     return torch.from_numpy(output)
 
@@ -244,8 +280,8 @@ def test_gzsl(opt, model, testloader, attribute, test_classes,all_classes,origin
         for i, (input, target, impath) in \
                 enumerate(testloader):
             if opt.cuda:
-                input = input.to(torch.device("cuda:"+opt.gpu))
-                target = target.to(torch.device("cuda:"+opt.gpu))
+                input = input.to(torch.device(opt.device))
+                target = target.to(torch.device(opt.device))
             #output = model(input, attribute,get_prediction=True,opt=opt)
             pre_attri, boxes = model(input, attribute=attribute, opt=opt, extract_bb=True)
 
@@ -273,7 +309,7 @@ def test_gzsl(opt, model, testloader, attribute, test_classes,all_classes,origin
 
 
                 if opt.cuda:
-                    cropped_images = cropped_images.to(torch.device("cuda:"+opt.gpu))
+                    cropped_images = cropped_images.to(torch.device(opt.device))
 
                 pre_attri, boxes = model(cropped_images, attribute=attribute, opt=opt)
 
@@ -311,12 +347,12 @@ def test_gzsl_loss(opt, model, testloader, attribute,reg_weight,criterion, crite
         for i, (input, target, impath) in \
                 enumerate(testloader):
             if opt.cuda:
-                input = input.to(torch.device("cuda:"+opt.gpu))
-                target = target.to(torch.device("cuda:"+opt.gpu))
+                input = input.to(torch.device(opt.device))
+                target = target.to(torch.device(opt.device))
             output, pre_attri, attention, pre_class = model(input, attribute)
             if opt.calibrated_stacking:
                 output = calibrated_stacking(opt, output, opt.calibrated_stacking)
-            output = output.to(torch.device("cuda:"+opt.gpu))
+            output = output.to(torch.device(opt.device))
             label_a = attribute[:, target].t()
 
             loss = Loss_fn(opt, loss_log, reg_weight, criterion, criterion_regre, model,
@@ -341,8 +377,8 @@ def test_gzsl_tune_CL(opt, model, testloader, attribute, test_classes, CL=0.98):
         for i, (input, target, impath) in \
                 enumerate(testloader):
             if opt.cuda:
-                input = input.to(torch.device("cuda:"+opt.gpu))
-                target = target.to(torch.device("cuda:"+opt.gpu))
+                input = input.to(torch.device(opt.device))
+                target = target.to(torch.device(opt.device))
             output, _, _, pre_class = model(input, attribute)
             if CL:
                 output = calibrated_stacking(opt, output, CL)
@@ -425,8 +461,8 @@ def test_with_IoU(opt, model, testloader, attribute, test_classes, vis_groups=No
                     save_att_idx.append(0)
 
             if opt.cuda:
-                input = input.to(torch.device("cuda:"+opt.gpu))
-                target = target.to(torch.device("cuda:"+opt.gpu))
+                input = input.to(torch.device(opt.device))
+                target = target.to(torch.device(opt.device))
 
             output, pre_attri, attention, _ = model(input, attribute)
             # pre_attri.shape : 64， 312
@@ -525,8 +561,8 @@ def get_loader(opt, data):
                                         normalize,])
 
         test_transform = transforms.Compose([
-                                            transforms.Resize(int(size * 8. / 7.)),
-                                            transforms.RandomCrop(size),
+                                            transforms.Resize(int(size)),
+                                            transforms.CenterCrop(size),
                                             transforms.ToTensor(),
                                             normalize, ])
 
@@ -541,11 +577,14 @@ def get_loader(opt, data):
     if opt.train_mode == 'distributed':
         train_label = dataset_train.image_labels
         #print('len(train_label)', len(train_label))
-        sampler = CategoriesSampler(
-            train_label,
-            batch_size=opt.n_batch,
+
+
+        sampler = CategoriesSampler2(
+            label_for_imgs=train_label,
+            n_batch=opt.n_batch,
             n_cls=opt.ways,
-            n_per=opt.shots
+            n_per=opt.shots,
+            ep_per_batch = 1
         )
         trainloader = torch.utils.data.DataLoader(dataset=dataset_train, batch_sampler=sampler, num_workers=opt.workers, pin_memory=True)
     if opt.train_mode == 'ltnsampler':
@@ -574,11 +613,7 @@ def get_loader(opt, data):
         num_workers=4, pin_memory=True)
 
     dataset_test_seen = ImageFilelist(opt, data_inf=data,
-                                      transform=transforms.Compose([
-                                          transforms.Resize(256),
-                                          transforms.CenterCrop(size),
-                                          transforms.ToTensor(),
-                                          normalize, ]),
+                                      transform=test_transform,
                                       dataset=opt.dataset,
                                       image_type='test_seen_loc')
     testloader_seen = torch.utils.data.DataLoader(
@@ -589,7 +624,7 @@ def get_loader(opt, data):
     # dataset for visualization (CenterCrop)
     dataset_visual = ImageFilelist(opt, data_inf=data,
                                    transform=transforms.Compose([
-                                       transforms.Resize(256),
+                                       transforms.Resize(size),
                                        transforms.CenterCrop(size),
                                        transforms.ToTensor(),
                                        normalize, ]),
@@ -620,7 +655,7 @@ def get_middle_graph(weight_cpt, model):
                 middle_graph[x * kernel_size + y, :, :] = \
                     raw_graph[kernel_size - 1 - x: 2 * kernel_size - 1 - x,
                     kernel_size - 1 - y: 2 * kernel_size - 1 - y]
-        middle_graph = middle_graph.to(torch.device("cuda:"+opt.gpu))
+        middle_graph = middle_graph.to(torch.device(opt.device))
     return middle_graph
 
 

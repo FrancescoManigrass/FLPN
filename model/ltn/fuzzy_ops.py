@@ -1560,17 +1560,37 @@ class AggregWMean(AggregationOperator):
 
 class AggregSum(AggregationOperator):
     """
-    Min fuzzy aggregation operator.
+    `pMeanError` fuzzy aggregation operator.
 
-    :math:`A_{T_{M}}(x_1, \\dots, x_n) = \\operatorname{min}(x_1, \\dots, x_n)`
+    :math:`A_{pME}(x_1, \\dots, x_n) = 1 - (\\frac{1}{n} \\sum_{i = 1}^n (1 - x_i)^p)^{\\frac{1}{p}}`
+
+    Parameters
+    ----------
+    p : :obj:`int`, default=2
+        Value of hyper-parameter `p` of the `pMeanError` fuzzy aggregation operator.
+    stable : :obj:`bool`, default=True
+        Flag indicating whether to use the :ref:`stable version <stable>` of the operator or not.
+
+    Attributes
+    ----------
+    p : :obj:`int`
+        See `p` parameter.
+    stable : :obj:`bool`
+        See `stable` parameter.
+
+    Notes
+    -----
+    The `pMeanError` aggregation operator has been selected as an approximation of
+    :math:`\\forall` with :math:`p \geq 1`. If :math:`p \\to \infty`, then the `pMeanError` operator tends to the
+    minimum of the input values (classical behavior of :math:`\\forall`).
 
     Examples
     --------
     >>> import ltn
     >>> import torch
-    >>> Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregMin(), quantifier='f')
+    >>> Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(), quantifier='f')
     >>> print(Forall)
-    Quantifier(agg_op=AggregMin(), quantifier='f')
+    Quantifier(agg_op=AggregPMeanError(p=2, stable=True), quantifier='f')
     >>> p = ltn.Predicate(func=lambda x: torch.nn.Sigmoid()(
     ...                                     torch.sum(x, dim=1)
     ...                                  ))
@@ -1578,26 +1598,77 @@ class AggregSum(AggregationOperator):
     >>> print(p(x).value)
     tensor([0.6365, 0.7109, 0.6682])
     >>> print(Forall(x, p(x)).value)
-    tensor(0.6365)
+    tensor(0.6704)
 
     .. automethod:: __call__
     """
 
-    def __repr__(self):
-        return "AggregSum()"
+    def __init__(self, p=2, stable=True):
+        """
+        This constructor has to be used to set whether it has to be used the stable version (it avoids gradient
+        problems) of the p-mean error aggregator or not. Also, it is possible to set the value of the parameter p.
 
-    def __call__(self, xs, p=2, dim=None, keepdim=False, mask=None):
+        Parameters
+        ----------
+        p: :obj:`int`
+            Value of the parameter p.
+        stable: :obj:`bool`
+            A boolean flag indicating whether it has to be used the stable version of the aggregator or not.
+        """
+        self.p = p
+        self.stable = stable
+
+    def __repr__(self):
+        return "AggregPMeanError(p=" + str(self.p) + ", stable=" + str(self.stable) + ")"
+
+    def __call__(self, xs, dim=None, keepdim=False, mask=None, p=None, stable=None):
+        """
+        It applies the `pMeanError` aggregation operator to the given formula's :ref:`grounding <notegrounding>`
+        on the selected dimensions.
+
+        Parameters
+        ----------
+        xs : :class:`torch.Tensor`
+            :ref:`Grounding <notegrounding>` of formula on which the aggregation has to be performed.
+        dim : :obj:`tuple` of :obj:`int`, default=None
+            Tuple containing the indexes of dimensions on which the aggregation has to be performed.
+        keepdim : :obj:`bool`, default=False
+            Flag indicating whether the output has to keep the same dimensions as the input after
+            the aggregation.
+        mask : :class:`torch.Tensor`, default=None
+            Boolean mask for excluding values of 'xs' from the aggregation. It is internally used for guarded
+            quantification. The mask must have the same shape of 'xs'. `False` means exclusion, `True` means inclusion.
+        p : :obj:`int`, default=None
+            Value of hyper-parameter `p` of the `pMeanError` fuzzy aggregation operator.
+        stable: :obj:`bool`, default=None
+            Flag indicating whether to use the :ref:`stable version <stable>` of the operator or not.
+
+        Returns
+        ----------
+        :class:`torch.Tensor`
+            `pMeanError` fuzzy aggregation of the formula.
+
+        Raises
+        ------
+        :class:`ValueError`
+            Raises when the :ref:`grounding <notegrounding>` of the formula ('xs') and the mask do not have the same
+            shape.
+            Raises when the 'mask' is not boolean.
+        """
+        p = self.p if p is None else p
+        stable = self.stable if stable is None else stable
 
         if mask is not None:
             if mask.shape != xs.shape:
                 raise ValueError("'xs' and 'mask' must have the same shape.")
             if not mask.dtype == torch.bool:  # isinstance(mask, torch.BoolTensor):
                 raise ValueError("'mask' must be a torch.BoolTensor.")
+            # we sum the values of xs which are not filtered out by the mask
+            numerator = torch.sum(torch.where(~mask, torch.zeros_like(xs), xs), dim=dim, keepdim=keepdim)
 
-            return torch.sum(torch.where(~mask, torch.zeros_like(xs), xs), keepdim=keepdim, dim=dim)
+            return numerator
         else:
-            return torch.sum(xs)
-
+            return torch.sum(xs, dim=dim, keepdim=keepdim)
 
 
 
@@ -2228,12 +2299,84 @@ class Aggreg_LogSumExp(AggregationOperator):
         max_val = torch.max(alpha * xs, dim=dim, keepdim=keepdim)
         return (1 / alpha) * (max_val + torch.log(torch.exp((alpha * xs) - max_val)))
 
+class Aggreg_Sum(AggregationOperator):
+    """
+    Min fuzzy aggregation operator.
+
+    :math:`A_{T_{M}}(x_1, \\dots, x_n) = \\operatorname{min}(x_1, \\dots, x_n)`
+
+    Examples
+    --------
+    >>> import ltn
+    >>> import torch
+    >>> Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregMin(), quantifier='f')
+    >>> print(Forall)
+    Quantifier(agg_op=AggregMin(), quantifier='f')
+    >>> p = ltn.Predicate(func=lambda x: torch.nn.Sigmoid()(
+    ...                                     torch.sum(x, dim=1)
+    ...                                  ))
+    >>> x = ltn.Variable('x', torch.tensor([[0.56], [0.9], [0.7]]))
+    >>> print(p(x).value)
+    tensor([0.6365, 0.7109, 0.6682])
+    >>> print(Forall(x, p(x)).value)
+    tensor(0.6365)
+
+    .. automethod:: __call__
+    """
+
+    def __repr__(self):
+        return "Aggreg_LogSumExp()"
+
+    def __call__(self, xs, p=2, dim=None, keepdim=False, mask=None, alpha=1):
+        """
+        It applies the min fuzzy aggregation operator to the given formula's :ref:`grounding <notegrounding>` on
+        the selected dimensions.
+
+        Parameters
+        ----------
+        xs : :class:`torch.Tensor`
+            :ref:`Grounding <notegrounding>` of formula on which the aggregation has to be performed.
+        dim : :obj:`tuple` of :obj:`int`, default=None
+            Tuple containing the indexes of dimensions on which the aggregation has to be performed.
+        keepdim : :obj:`bool`, default=False
+            Flag indicating whether the output has to keep the same dimensions as the input after
+            the aggregation.
+        mask : :class:`torch.Tensor`, default=None
+            Boolean mask for excluding values of 'xs' from the aggregation. It is internally used for guarded
+            quantification. The mask must have the same shape of 'xs'. `False` means exclusion, `True` means inclusion.
+
+        Returns
+        ----------
+        :class:`torch.Tensor`
+            Min fuzzy aggregation of the formula.
+
+        Raises
+        ------
+        :class:`ValueError`
+            Raises when the :ref:`grounding <notegrounding>` of the formula ('xs') and the mask do not have the same
+            shape.
+            Raises when the 'mask' is not boolean.
+        """
+        if mask is not None:
+            if mask.shape != xs.shape:
+                raise ValueError("'xs' and 'mask' must have the same shape.")
+            if not mask.dtype == torch.bool:
+                raise ValueError("'mask' must be a torch.BoolTensor.")
+            # here, we put 1 where the mask is not satisfied, since 1 is the maximum value for a truth value.
+            # this is a way to exclude values from the minimum computation
+            xs = torch.where(~mask, 1., xs.double())
+        # out = torch.sum(xs,dim=dim,keepdim=keepdim)
+
+        return torch.sum(xs,dim=dim, keepdim=keepdim)
+
+
+
 class Aggreg_LogMeanExp(AggregationOperator):
 
     def __repr__(self):
         return "Aggreg_LogMeanExp()"
 
-    def __call__(self, xs, dim=None, keepdim=False, mask=None, alpha=1):
+    def __call__(self, xs, dim=None, keepdim=False, mask=None, alpha=1,p=None):
         """
         It applies the min fuzzy aggregation operator to the given formula's :ref:`grounding <notegrounding>` on
         the selected dimensions.
@@ -2281,9 +2424,11 @@ class Not_log_negation_softmax(UnaryConnectiveOperator):
         return "Not_log_negation_softmax()"
 
     def __call__(self, x):
-        log_expr_tensor = torch.clamp(x, min=0.001, max=0.99)
+        #
 
-        return torch.log(1-log_expr_tensor)
+        x = torch.exp(x)
+        x = torch.clamp(x, min=0.001, max=0.99)
+        return torch.log(1-x)
 
 
 

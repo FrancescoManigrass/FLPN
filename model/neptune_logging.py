@@ -6,4 +6,6 @@ def log_loss_training(opt,loss,step=None):
         if step == None:
             opt.neptune.log_metric(i,loss[i])
         else:
-            opt.neptune.log_metric(i, loss[i] / step)
+
+            opt.neptune.log_metric(i, loss[i] /step)
+

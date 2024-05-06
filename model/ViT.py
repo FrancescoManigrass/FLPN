@@ -3,6 +3,7 @@ import torch
 import timm
 import numpy as np
 import ltn
+import logltn
 from utils_zsl import create_fake
 from model_proto import MLP, similarity3, cosine_similarity
 import torch.nn.functional as F
@@ -54,22 +55,7 @@ class ViT(nn.Module):
             exit(1)
             self.ALE = LINEAR_SOFTMAX_ALE(input_dim=self.channel_dict['avg_pool'], attri_dim=85)
         elif opt.dataset == 'AWA2':
-            """
-            self.prototype_vectors = dict()
-            self.prototype_vectors = nn.ParameterDict(self.prototype_vectors)
-            self.prototype_vectors = nn.ParameterDict(self.prototype_vectors)
-            # self.ALE_vector = nn.Parameter(2e-4 * torch.rand([85, 768, 1, 1]), requires_grad=True)
 
-            self.ALE_vector = nn.Parameter(2e-4 * torch.rand([768, 85]), requires_grad=True)
-            self.ALE_vector_cropped = nn.Parameter(2e-4 * torch.rand([85, 2048, 1, 1]), requires_grad=True)
-            self.MLP = MLP(9, 9)
-
-
-            self.ALE_PARTS = nn.Parameter(2e-4 * torch.rand([85, 9]), requires_grad=True)
-            self.hasAttributeofclassLambda = ltn.Function(func=lambda x, y: torch.gather(x, 1, y).view(-1))
-            self.macroclass_vector = nn.Parameter(2e-4 * torch.rand([85, 9]), requires_grad=True)
-            self.attribute_vector = nn.Parameter(torch.rand([85, 85]), requires_grad=True)  # ���p
-            """
             self.attr_proto_size = 1024
             self.part_num = 85
             hid_size = 1024
@@ -80,7 +66,7 @@ class ViT(nn.Module):
                 self.prototype_vectors[name] = nn.Parameter(2e-4 * torch.rand(prototype_shape),
                                                             requires_grad=True)  # ���p
             self.prototype_vectors = nn.ParameterDict(self.prototype_vectors)
-            self.ALE_vector = nn.Parameter(2e-4 * torch.rand([102, 1024, 1, 1]), requires_grad=True)  # h@/�p
+            self.ALE_vector = nn.Parameter(2e-4 * torch.rand([102, 1024, 1, 1]), requires_grad=True)
 
         self.avg_pool = opt.avg_pool
         self.avg_pool_part = opt.avg_pool_part
@@ -96,37 +82,20 @@ class ViT(nn.Module):
         self.hasAttributeEnd = ltn.Function(func=lambda x, y: get_and_of_attributes(x, y))
         self.same_class = ltn.Function(func=lambda x, y: cosine_similarity(x, y))
         self.same_part = ltn.Function(func=lambda x, y: similarity4(x, y))
-        self.hasAttributeEndError = ltn.Function(func=lambda x, y: get_and_of_attributes_error(x,
-                                                                                               y))  # ltn.Predicate(model = Has_attribute())#[ltn.Predicate(model=Predicate_ltn(num_features=85,name=f.__str__()))  for f in range(85)]
-        # self.hasAttributeModel = Has_attribute()
-        """
-        if opt.cuda:
-            for f in range(len(self.hasAttribute)):
-                self.hasAttribute[f]=self.hasAttribute[f].cuda()
-        """
-        """
-        self.hasAttribute = ltn.Function(func=lambda x, y: torch.exp(-(1-0.99*F.cosine_similarity(x,y))).view(-1))
-        self.hasAttributeofclass = ltn.Function(func=lambda x, y: torch.gather(x,1,y).view(-1))
-        """
-        # self.hasAttribute = Predicate_ltn_same_class(name="hasAttribute",num_features=85*2)
-        # self.hasAttributelambda = ltn.Function(func=lambda x, y: torch.gather(x, 1, y).view(-1))
-        # self.hasAttribute = ltn.Function(func=lambda x, y: torch.gather(x, 1, y).view(-1))
+        self.hasAttributeEndError = ltn.Function(func=lambda x, y: get_and_of_attributes_error(x, y))
+
         if opt.logltn:
-
-            self.Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregMean(), quantifier="e")
-            self.SatAgg = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregMean())
-            self.And = ltn.Connective(ltn.fuzzy_ops.And_Sum())
-            self.Exists = ltn.Quantifier(ltn.fuzzy_ops.Aggreg_LogMeanExp(), quantifier="e")
-            self.Not = ltn.Connective(ltn.fuzzy_ops.Not_log_negation_softmax())
-
-            self.Or = ltn.Connective(ltn.fuzzy_ops.OR_LogMeanExp())
+            self.Forall = logltn.Quantifier(logltn.fuzzy_ops.AggregMean(), quantifier="f")
+            self.SatAgg = logltn.fuzzy_ops.SatAgg(logltn.fuzzy_ops.AggregMean())
+            self.And = logltn.Connective(logltn.fuzzy_ops.And_Sum())
+            self.Exists = logltn.Quantifier(logltn.fuzzy_ops.Aggreg_LogMeanExp(), quantifier="e")
+            self.Not = logltn.Connective(logltn.fuzzy_ops.Not_log_negation_softmax())
+            self.Or = logltn.Connective(logltn.fuzzy_ops.OR_LogMeanExp())
         else:
             self.Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(), quantifier="f")
             self.SatAgg = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError())
-
             self.And = ltn.Connective(ltn.fuzzy_ops.AndProd())
             self.Exists = ltn.Quantifier(ltn.fuzzy_ops.AggregPMean(p=2), quantifier="e")
-
             self.Not = ltn.Connective(ltn.fuzzy_ops.NotStandard())
             self.Or = ltn.Connective(ltn.fuzzy_ops.OrProbSum())
         self.same_class = ltn.Function(func=lambda x, y: cosine_similarity(x, y))

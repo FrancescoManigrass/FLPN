@@ -1,6 +1,6 @@
 import os
 import random
-
+import logltn
 import torch.nn as nn
 import torch
 import torchvision
@@ -10,7 +10,6 @@ from PIL import Image
 from matplotlib import pyplot as plt
 import numpy as np
 import ltn
-from ltn.Predicate_ltn import Predicate_ltn, isOfClassLTN, Predicate_ltn_same_class, Has_attribute
 from losses import SupConLoss
 from utils_zsl import create_fake
 from nets import ProtoModel
@@ -77,155 +76,6 @@ class LAYER_ALE(nn.Module):
         output = self.softmax(middle.mm(attribute))
         return output
 
-
-"""
-class isofclass(nn.Module):
-    def __init__(self,opt,attribute):
-        super(isofclass,self).__init__()
-        self.attribute = attribute
-        self.opt = opt
-        if opt.cuda == True :
-            self.attribute=self.attribute.to(torch.device("cuda:"+opt.gpu))
-
-        self.extract = ['layer4']  # 'layer1', 'layer2', 'layer3', 'layer4'
-        self.dim_dict = {'layer1': 56 * 56, 'layer2': 28 * 28, 'layer3': 14 * 14, 'layer4': 7 * 7, 'avg_pool': 1 * 1}
-        self.channel_dict = {'layer1': 256, 'layer2': 512, 'layer3': 1024, 'layer4': 2048, 'avg_pool': 2048}
-        self.kernel_size = {'layer1': 56, 'layer2': 28, 'layer3': 14, 'layer4': 7, 'avg_pool': 1}
-        self.batch_size = opt.batch_size
-        self.softmax = nn.Softmax(dim=1)
-
-        if opt.dataset == 'CUB':
-            self.ALE_vector = nn.Parameter(2e-4 * torch.rand([312, 2048, 1, 1]), requires_grad=True)
-        elif opt.dataset == 'AWA1':
-            exit(1)
-            self.ALE = LINEAR_SOFTMAX_ALE(input_dim=self.channel_dict['avg_pool'], attri_dim=85)
-        elif opt.dataset == 'AWA2':
-            self.ALE_vector = nn.Parameter(2e-4 * torch.rand([85, 2048, 1, 1]), requires_grad=True)
-        elif opt.dataset == 'SUN':
-            self.ALE_vector = nn.Parameter(2e-4 * torch.rand([102, 2048, 1, 1]), requires_grad=True)  # 全局分支参数
-
-
-
-        self.avg_pool = opt.avg_pool
-
-    def forward(self,x,label,attribute,get_prediction=False,size=0):
-
-        batch_size = x.size(0)
-        attention = dict()
-        pre_attri = dict()
-        pre_class = dict()
-        ######### 全局分支
-        if self.avg_pool:
-            pre_attri['final'] = F.avg_pool2d(F.conv2d(input=x, weight=self.ALE_vector), kernel_size=7).view(batch_size, -1)
-        else:
-            pre_attri['final'] = F.max_pool2d(F.conv2d(input=x, weight=self.ALE_vector), kernel_size=7).view(batch_size, -1)
-            # 全局分支 [64, 312]
-
-
-
-        if get_prediction==False:
-            #output_final = self.softmax(pre_attri['final'].mm(attribute))[label.value,1]  #[batchsize,类别数]
-            output_final = torch.gather(self.softmax(pre_attri['final'].mm(attribute)),1,label)
-        else:
-            output_final = self.softmax(pre_attri['final'].view(-1,size,85)[:,0,:].mm(attribute.view(-1,size,85)[0,:,:].T))
-        return output_final
-
-
-class hasAttribute(nn.Module):
-    def __init__(self,opt,attribute):
-        super(hasAttribute,self).__init__()
-        self.attribute = attribute
-        self.opt = opt
-        if opt.cuda == True :
-            self.attribute=self.attribute.to(torch.device("cuda:"+opt.gpu))
-
-        self.extract = ['layer4']  # 'layer1', 'layer2', 'layer3', 'layer4'
-        self.dim_dict = {'layer1': 56 * 56, 'layer2': 28 * 28, 'layer3': 14 * 14, 'layer4': 7 * 7, 'avg_pool': 1 * 1}
-        self.channel_dict = {'layer1': 256, 'layer2': 512, 'layer3': 1024, 'layer4': 2048, 'avg_pool': 2048}
-        self.kernel_size = {'layer1': 56, 'layer2': 28, 'layer3': 14, 'layer4': 7, 'avg_pool': 1}
-        self.batch_size = opt.batch_size
-        self.softmax = nn.Softmax(dim=1)
-
-        if opt.dataset == 'CUB':
-            self.prototype_vectors = dict()
-            for name in self.extract:
-                prototype_shape = [312, self.channel_dict[name], 1, 1]
-                self.prototype_vectors[name] = nn.Parameter(2e-4 * torch.rand(prototype_shape), requires_grad=True)
-            self.prototype_vectors = nn.ParameterDict(self.prototype_vectors)
-
-        elif opt.dataset == 'AWA1':
-            exit(1)
-
-        elif opt.dataset == 'AWA2':
-            self.prototype_vectors = dict()
-            for name in self.extract:
-                prototype_shape = [85, self.channel_dict[name], 1, 1]
-                self.prototype_vectors[name] = nn.Parameter(2e-4 * torch.rand(prototype_shape), requires_grad=True)
-            self.prototype_vectors = nn.ParameterDict(self.prototype_vectors)
-
-        elif opt.dataset == 'SUN':
-            self.prototype_vectors = dict()
-            for name in self.extract:
-                prototype_shape = [102, self.channel_dict[name], 1, 1]
-                self.prototype_vectors[name] = nn.Parameter(2e-4 * torch.rand(prototype_shape),
-                                                            requires_grad=True)  # 原型参数
-            self.prototype_vectors = nn.ParameterDict(self.prototype_vectors)
-
-
-
-        self.avg_pool = opt.avg_pool
-
-    def forward(self,x,y=None,label=None,attribute=None,same_attribute=False):
-
-        batch_size = x.size(0)
-        attention = dict()
-        pre_attri = dict()
-        pre_class = dict()
-
-        attention2 = dict()
-        pre_attri2 = dict()
-        pre_class2 = dict()
-        ######### 全局分支
-
-        for name in self.extract:
-            #### 求内积，得到 M
-
-            attention[name] = F.conv2d(input=x,
-                                       weight=self.prototype_vectors[name])  # [64, 312, 7, 7]
-            # attention[name] = torch.einsum('bfmn,vf->bvmn',record_features[name],self.prototype_vectors[name])
-
-            #### 最大化，得到 a
-            pre_attri[name] = F.max_pool2d(attention[name], kernel_size=self.kernel_size[name]).view(batch_size,
-                                                                                                     -1)  # [64, 312]
-            #### 得到分类结果
-            if attribute!=None:
-                pre_class[name] = self.softmax(pre_attri[name].mm(attribute))  # [64, 150]
-
-        if same_attribute:
-            for name in self.extract:
-                #### 求内积，得到 M
-
-                attention2[name] = F.conv2d(input=y.value,
-                                           weight=self.prototype_vectors[name])  # [64, 312, 7, 7]
-                # attention[name] = torch.einsum('bfmn,vf->bvmn',record_features[name],self.prototype_vectors[name])
-
-                #### 最大化，得到 a
-                pre_attri2[name] = F.max_pool2d(attention2[name], kernel_size=self.kernel_size[name]).view(batch_size,
-                                                                                                         -1)  # [64, 312]
-                #### 得到分类结果
-                if attribute != None:
-                    pre_class2[name] = self.softmax(pre_attri2[name].mm(attribute))  # [64, 150]
-
-
-
-            #output_final = self.softmax(pre_attri['final'].mm(attribute))[label,1]  #[batchsize,类别数]
-            return torch.exp(-(1-F.cosine_similarity(pre_attri[name],attribute.T[torch.squeeze(label.value)])))
-        else:
-            x = torch.gather(pre_class[name], 1, y )
-            return  x.view(x.size(0), -1)
-
-
-"""
 
 
 def cosine_dis(pred_att, support_att, scale=1.0):
@@ -520,21 +370,17 @@ class resnet_proto_IoU(nn.Module):
         # self.hasAttributelambda = ltn.Function(func=lambda x, y: torch.gather(x, 1, y).view(-1))
         # self.hasAttribute = ltn.Function(func=lambda x, y: torch.gather(x, 1, y).view(-1))
         if opt.logltn:
-
-            self.Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregSum(), quantifier="f")
-            self.SatAgg = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregMean())
-            self.And = ltn.Connective(ltn.fuzzy_ops.And_Sum())
-            self.Exists = ltn.Quantifier(ltn.fuzzy_ops.Aggreg_LogMeanExp(), quantifier="e")
-            self.Not = ltn.Connective(ltn.fuzzy_ops.Not_log_negation_softmax())
-
-            self.Or = ltn.Connective(ltn.fuzzy_ops.OR_LogMeanExp())
+            self.Forall = logltn.Quantifier(logltn.fuzzy_ops.AggregMean(), quantifier="f")
+            self.SatAgg = logltn.fuzzy_ops.SatAgg(logltn.fuzzy_ops.AggregMean())
+            self.And = logltn.Connective(logltn.fuzzy_ops.And_Sum())
+            self.Exists = logltn.Quantifier(logltn.fuzzy_ops.Aggreg_LogMeanExp(), quantifier="e")
+            self.Not = logltn.Connective(logltn.fuzzy_ops.Not_log_negation_softmax())
+            self.Or = logltn.Connective(logltn.fuzzy_ops.OR_LogMeanExp())
         else:
             self.Forall = ltn.Quantifier(ltn.fuzzy_ops.AggregPMeanError(), quantifier="f")
             self.SatAgg = ltn.fuzzy_ops.SatAgg(ltn.fuzzy_ops.AggregPMeanError())
-
             self.And = ltn.Connective(ltn.fuzzy_ops.AndProd())
             self.Exists = ltn.Quantifier(ltn.fuzzy_ops.AggregPMean(p=2), quantifier="e")
-
             self.Not = ltn.Connective(ltn.fuzzy_ops.NotStandard())
             self.Or = ltn.Connective(ltn.fuzzy_ops.OrProbSum())
         self.dist = lambda x, y: torch.unsqueeze(torch.norm(x - y, dim=1), dim=1)

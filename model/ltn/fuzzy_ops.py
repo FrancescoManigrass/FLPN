@@ -2099,7 +2099,7 @@ class OR_LogMeanExp(BinaryConnectiveOperator):
             The Godel fuzzy disjunction of the two operands.
         """
         max_val = torch.maximum(x, y)
-        return max_val + torch.log(torch.mean(torch.stack([torch.exp(x - max_val), torch.exp(y - max_val)])))
+        return max_val + torch.log(torch.mean(torch.stack([torch.exp(x - max_val), torch.exp(y - max_val)]),dim=0))
 
 class OrLogExp(BinaryConnectiveOperator):
     """
@@ -2413,10 +2413,24 @@ class Aggreg_LogMeanExp(AggregationOperator):
                 raise ValueError("'mask' must be a torch.BoolTensor.")
             # here, we put 1 where the mask is not satisfied, since 1 is the maximum value for a truth value.
             # this is a way to exclude values from the minimum computation
-            xs = torch.where(~mask, 0., xs.double())
+
+            max_val= torch.amax(torch.where(~mask, -torch.inf, xs),dim=dim,keepdim=keepdim)
+            max_val = torch.where(torch.isinf(max_val),torch.zeros_like(max_val),max_val)
+
+            numerator = torch.sum(torch.where(~mask, torch.zeros_like(xs), xs), dim=dim, keepdim=keepdim)
+
+            # we count the number of 1 in the mask
+            denominator = torch.sum(mask, dim=dim, keepdim=keepdim)
+            tensor=(1/alpha)*(max_val + torch.log(torch.div(torch.exp((alpha*numerator)-max_val),denominator)))
+            return  torch.where(torch.isinf(tensor),torch.nan,tensor)
+
+        else:
+            max_val= torch.amax(xs,dim=dim,keepdim=keepdim)
+
+            return (1 / alpha) * (max_val + torch.log(torch.mean(torch.exp(alpha * xs - max_val), dim=dim,keepdim=keepdim)))
         # out = torch.sum(xs,dim=dim,keepdim=keepdim)
-        max_val = torch.max(alpha * xs, dim=dim[0], keepdim=True)[0].view(-1, 1)
-        return (1 / alpha) * (max_val + torch.log(torch.mean(torch.exp(alpha * xs - max_val), dim=dim[0])).view(-1,1)).view(-1)
+        #max_val = torch.amax(xs,dim=dim,keepdim=keepdim)
+        #return (1 / alpha) * (max_val + torch.log(torch.mean(torch.exp(alpha * xs - max_val), dim=dim,keepdim=keepdim)).view(-1,1)).view(-1)
 
 class Not_log_negation_softmax(UnaryConnectiveOperator):
 

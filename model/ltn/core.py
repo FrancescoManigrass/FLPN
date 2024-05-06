@@ -1558,6 +1558,7 @@ class Quantifier:
             # The result of the aggregation operator in such case is often not defined (e.g. NaN).
             # We replace the result with 0.0 if the semantics of the aggregator is exists,
             # or 1.0 if the semantics of the aggregator is forall.
+
             rep_value = 1. if self.quantifier == "f" else 0.
             output = torch.where(
                 torch.isnan(output),
@@ -1881,7 +1882,7 @@ class QuantifierLog:
         formula : :class:`ltn.core.LTNObject`
             Formula on which the quantification has to be performed.
         cond_vars : :obj:`list` of :class:`ltn.core.Variable`, default=None
-            List of LTN variables that appear in the :ref:`guarded quantification <guarded>` condition.
+            List of LTN variable<<s that appear in the :ref:`guarded quantification <guarded>` condition.
         cond_fn : :class:`function`, default=None
             Function representing the :ref:`guarded quantification <guarded>` condition.
 

@@ -24,9 +24,7 @@ from visual_utils import ImageFilelist, compute_per_class_acc, compute_per_class
     prepare_attri_label, add_glasso, add_dim_glasso
 from logger import Logger
 # from utils import init_log
-
-
-
+from model_proto import resnet_proto_IoU
 import numpy as np
 from tqdm import tqdm
 import torch
@@ -50,32 +48,25 @@ opt = get_opt()
 if opt.manualSeed is None:
     opt.manualSeed = random.randint(1, 10000)
 # print("Random Seed: ", opt.manualSeed)
-random.seed(opt.manualSeed)
 torch.manual_seed(opt.manualSeed)
-np.random.seed(opt.manualSeed)
-
-
-from model_proto import resnet_proto_IoU
-
-
-
-torch.manual_seed(opt.manualSeed)
+torch.cuda.manual_seed(opt.manualSeed)
 torch.cuda.manual_seed_all(opt.manualSeed)
 random.seed(opt.manualSeed)
+np.random.seed(opt.manualSeed)
+torch.manual_seed(opt.manualSeed)
+torch.cuda.manual_seed_all(opt.manualSeed)
 torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic=True
-
+torch.backends.cudnn.deterministic=  True
 if opt.cuda:
     torch.cuda.manual_seed_all(opt.manualSeed)
 
 
 def main():
-    torch.cuda.set_device("cuda:" + opt.gpu)
-    opt.device="cuda:" + opt.gpu
     # load data
     data = visual_utils.DATA_LOADER(opt)
     # print(opt)
     opt.test_seen_label = data.test_seen_label  # weird
+    opt.device=torch.device("cuda:" + opt.gpu)
 
     if opt.neptune_flag:
 
@@ -114,20 +105,13 @@ def main():
     class_attribute = data.attribute
     class_attribute_original = data.original_att
     print("attribute to cuda")
-    attribute_zsl = prepare_attri_label(class_attribute, data.unseenclasses).to(torch.device("cuda:" + opt.gpu))
-    attribute_seen = prepare_attri_label(class_attribute, data.seenclasses).to(torch.device("cuda:" + opt.gpu))
-    attribute_zsl_original = prepare_attri_label(class_attribute_original, data.unseenclasses).to(torch.device("cuda:" + opt.gpu))
-    attribute_seen_original = prepare_attri_label(class_attribute_original, data.seenclasses).to(torch.device("cuda:" + opt.gpu))
-    if opt.dataset != "SUN":
-        attribute_macroclass_seen = prepare_attri_label(data.attribute_macroclass, data.seen_macroclass).to(torch.device("cuda:" + opt.gpu))
-    else:
-
-        attribute_macroclass_seen = torch.tensor(1, requires_grad=False)
-
-        attribute_macroclass_seen = attribute_macroclass_seen.to("cuda:" + opt.gpu)
-
-    attribute_gzsl = torch.transpose(class_attribute, 1, 0).to(torch.device("cuda:" + opt.gpu))
-    attribute_gzsl_original = torch.transpose(class_attribute_original, 1, 0).to(torch.device("cuda:" + opt.gpu))
+    attribute_zsl = prepare_attri_label(class_attribute, data.unseenclasses).cuda()
+    attribute_seen = prepare_attri_label(class_attribute, data.seenclasses).cuda()
+    attribute_zsl_original = prepare_attri_label(class_attribute_original, data.unseenclasses).cuda()
+    attribute_seen_original = prepare_attri_label(class_attribute_original, data.seenclasses).cuda()
+    attribute_macroclass_seen = prepare_attri_label(data.attribute_macroclass, data.seen_macroclass).cuda()
+    attribute_gzsl = torch.transpose(class_attribute, 1, 0).cuda()
+    attribute_gzsl_original = torch.transpose(class_attribute_original, 1, 0).cuda()
 
     print("init dataloader")
     # Dataloader for train, test, visual
@@ -161,31 +145,31 @@ def main():
 
     # define attribute groups
     if opt.dataset == 'CUB':
-        # parts = ['head', 'belly', 'breast', 'belly', 'wing', 'tail', 'leg', 'others']
-        # group_dic = json.load(open(os.path.join(os.path.dirname(os.getcwd()),opt.root, 'data', opt.dataset, 'attri_groups_8.json')))
-        # sub_group_dic = json.load(open(os.path.join(os.path.dirname(os.getcwd()),opt.root, 'data', opt.dataset, 'attri_groups_8_layer.json')))
+        parts = ['head', 'belly', 'breast', 'belly', 'wing', 'tail', 'leg', 'others']
+        group_dic = json.load(open(os.path.join(opt.root, 'data', opt.dataset, 'attri_groups_8.json')))
+        sub_group_dic = json.load(open(os.path.join(opt.root, 'data', opt.dataset, 'attri_groups_8_layer.json')))
         opt.resnet_path = 'pretrained_models/resnet101-5d3b4d8f.pth'
     elif opt.dataset == 'AWA2':
-        # parts = ['color', 'texture', 'shape', 'body_parts', 'behaviour', 'nutrition', 'activativity', 'habitat', 'character']
-        # `group_dic = json.load(open(os.path.join(opt.root, 'data', opt.dataset, 'attri_groups_9.json')))
-        # sub_group_dic = {}
+        parts = ['color', 'texture', 'shape', 'body_parts', 'behaviour', 'nutrition', 'activativity', 'habitat',
+                 'character']
+        group_dic = json.load(open(os.path.join(opt.root, 'data', opt.dataset, 'attri_groups_9.json')))
+        sub_group_dic = {}
 
         opt.resnet_path = './pretrained_models/resnet101-5d3b4d8f.pth'
     elif opt.dataset == 'SUN':
-        # parts = ['functions', 'materials', 'surface_properties', 'spatial_envelope']
-        # group_dic = json.load(open(os.path.join(opt.root, 'data', opt.dataset, 'attri_groups_4.json')))
-        # sub_group_dic = {}
+        parts = ['functions', 'materials', 'surface_properties', 'spatial_envelope']
+        group_dic = json.load(open(os.path.join(opt.root, 'data', opt.dataset, 'attri_groups_4.json')))
+        sub_group_dic = {}
         opt.resnet_path = 'pretrained_models/resnet101-5d3b4d8f.pth'
+
     # initialize model
     print('Create Model...')
 
     def create_model(attribute, binary_att, data, original_att):
 
-        if opt.model == "resnet101":
-            model = resnet_proto_IoU(opt, attribute, binary_att, data, original_att)
-        else:
-            model = ViT(opt=opt, attribute=attribute, binary_att=binary_att, data=data, original_att=original_att, model_name='vit_large_patch16_224_in21k',
-                        pretrained=True)
+        # model = resnet_proto_IoU(opt, attribute, binary_att, data, original_att)
+        model = ViT(opt=opt, attribute=attribute, binary_att=binary_att, data=data, original_att=original_att, model_name='vit_large_patch16_224_in21k',
+                    pretrained=True)
 
         return model
 
@@ -193,16 +177,16 @@ def main():
                          original_att=data.original_att)
 
     if torch.cuda.is_available():
-        model.to(torch.device("cuda:" + opt.gpu))
+        model.cuda()
 
-        attribute_zsl = attribute_zsl.to(torch.device("cuda:" + opt.gpu))
-        attribute_seen = attribute_seen.to(torch.device("cuda:" + opt.gpu))
-        attribute_macroclass_seen = attribute_macroclass_seen.to(torch.device("cuda:" + opt.gpu))
-        attribute_gzsl = attribute_gzsl.to(torch.device("cuda:" + opt.gpu))
-        model.binary_att = model.binary_att.to(torch.device("cuda:" + opt.gpu))
-        #model.parts_key = model.parts_key.to(torch.device("cuda:" + opt.gpu))
-        #model.parts = model.parts.to(torch.device("cuda:" + opt.gpu))
-        attribute_seen_original = attribute_seen_original.to(torch.device("cuda:" + opt.gpu))
+        attribute_zsl = attribute_zsl.cuda()
+        attribute_seen = attribute_seen.cuda()
+        attribute_macroclass_seen = attribute_macroclass_seen.cuda()
+        attribute_gzsl = attribute_gzsl.cuda()
+        model.binary_att = model.binary_att.cuda()
+        model.parts_key = model.parts_key.cuda()
+        model.parts = model.parts.cuda()
+        attribute_seen_original = attribute_seen_original.cuda()
 
     # layer_name = model.extract[0]  # only use one layer currently
     # compact loss configuration, define middle_graph
@@ -225,8 +209,10 @@ def main():
             print('ZSL test accuracy is {:.1f}%'.format(acc_ZSL))
         else:
             # test gzsl
-            acc_GZSL_unseen = test_gzsl(opt, model, testloader_unseen, attribute_gzsl, data.unseenclasses)
-            acc_GZSL_seen = test_gzsl(opt, model, testloader_seen, attribute_gzsl, data.seenclasses)
+            acc_GZSL_unseen = test_gzsl(opt, model, testloader_unseen, attribute_gzsl, data.unseenclasses,data.allclasses, attribute_gzsl_original)
+            acc_GZSL_seen = test_gzsl(opt, model, testloader_seen, attribute_gzsl, data.seenclasses,data.allclasses, attribute_gzsl_original)
+
+
 
             if (acc_GZSL_unseen + acc_GZSL_seen) == 0:
                 acc_GZSL_H = 0
@@ -248,7 +234,7 @@ def main():
             # print("training")
             model.train()
 
-            current_lr = opt.classifier_lr * (0.5 ** (epoch // 10))
+            current_lr = opt.classifier_lr * (0.8 ** (epoch // 10))
             realtrain = epoch > opt.pretrain_epoch
             # if epoch <= opt.pretrain_epoch:   # pretrain ALE for the first several epoches
             if not opt.resume and epoch < opt.pretrain_epoch:  # pretrain ALE for the first several epoches
@@ -256,42 +242,46 @@ def main():
 
                 # parameters = [model.ALE_vector]  #
                 parameters = [model.macroclass_vector]
+                """
+                , model.W, model.V_att_final_branch
+                              ,model.attribute_vector,model.V_att_final_classification
 
+                 for i in [model.QueryW, model.KeyW, model.ValueW, model.W_o, model.V_att_hidden_branch,
+                          model.V,model.V_att_conversion]: #,model.finale
+                    parameters.extend(list(i.parameters()))
+
+                """
                 for i in [model.proto_model]:  # ,model.finale
                     parameters.extend(list(i.parameters()))
 
-                if opt.model == "resnet101":
-                    for i in [model.extract_1, model.extract_2, model.extract_3, model.extract_4, model.fc_proto]:
-                        parameters.extend(list(i.parameters()))
-                else:
-                    model.vit.training = False
+                # , model.prototype_vectors[layer_name],model.macroclass_vector
+                # parameters.extend(list(model.hasAttribute.parameters()))
+                """
+                for f  in model.hasAttributeModel.layers:
+                    parameters.extend(f.parameters)
+                """
+                model.vit.training = False
 
                 # parameters.extend(list(itertools.chain(*[list(f.parameters()) for f in model.isOfClassLTN.layers])))
-                if opt.optimizer == "adam":
-                    optimizer = optim.Adam(params=parameters, lr=opt.pretrain_lr, betas=(opt.beta1, 0.999))
-                if opt.optimizer == "sgd":
-                    optimizer = optim.SGD(params=filter(lambda p: p.requires_grad, parameters), lr=current_lr,
-                                          momentum=0.9, weight_decay=0.0001)
+                optimizer = optim.Adam(params=parameters, lr=opt.pretrain_lr, betas=(opt.beta1, 0.999))
                 # optimizer = optim.SGD(params=parameters, lr=opt.pretrain_lr, momentum=0.9,weight_decay=0.0001)
             else:
-                if opt.model == "vit":
-                    model.vit.training = True
+                model.vit.training = True
                 print('All layers training')
-                #parameters = [f for f in model.parameters()]
+                parameters = [f for f in model.parameters()]
+                # , model.prototype_vectors[layer_name],model.macroclass_vector
+                # parameters.extend(list(model.hasAttribute.parameters()))
+                """
+                for f in model.hasAttributeModel.layers:
+                    parameters.extend(f.parameters)
+                """
+                # ��requires_grad=false�B
 
-                params_to_update = []
-                params_names = []
-
-                for name, param in model.named_parameters():
-                    if param.requires_grad == True:
-                        params_to_update.append(param)
-                        params_names.append(name)
-                if opt.optimizer == "adam":
-                    optimizer = optim.Adam(params=params_to_update, lr=current_lr,
-                                           betas=(opt.beta1, 0.999))
-                if opt.optimizer == "sgd":
-                    optimizer = optim.SGD(params=params_to_update, lr=current_lr,
-                                          momentum=0.9, weight_decay=0.00001)
+                # optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, model.parameters()),
+                #         lr=opt.classifier_lr, betas=(opt.beta1, 0.999))
+                optimizer = optim.Adam(params=filter(lambda p: p.requires_grad, parameters), lr=current_lr,
+                                       betas=(opt.beta1, 0.999))
+                # optimizer = optim.SGD(params=parameters, lr=opt.pretrain_lr, momentum=0.9, weight_decay=0.0001)
 
             loss_log = {'ave_loss': 0}
 
@@ -315,40 +305,35 @@ def main():
                     if len(batch_target) == 2:
                         batch_target_macroclass = batch_target[1]
                         batch_target = batch_target[0]
-                        """
                         if torch.max(batch_target_macroclass) > 8:
                             print("dfdfd")
-                        """
                         batch_target_macroclass2 = visual_utils.map_label(batch_target_macroclass, data.seen_macroclass)
-                        """
+
                         if torch.max(batch_target_macroclass2) > 8:
                             print("dfdfd")
-                        """
 
                     batch_target = visual_utils.map_label(batch_target, data.seenclasses)
 
                     input_v = Variable(batch_input)
 
                     label_v = Variable(batch_target)
-                    if opt.dataset == "SUN":
-                        batch_target_macroclass2 = torch.tensor(1, requires_grad=False)
                     label_m = Variable(batch_target_macroclass2)
 
                     if opt.cuda:
-                        input_v = input_v.to(torch.device("cuda:" + opt.gpu))
-                        label_v = label_v.to(torch.device("cuda:" + opt.gpu))
-                        label_m = label_m.to(torch.device("cuda:" + opt.gpu))
+                        input_v = input_v.cuda()
+                        label_v = label_v.cuda()
+                        label_m = label_m.cuda()
 
-                    axioms_options = {"p_axioms_class": 2.0, "p_axioms_macroclass": 1.0,
+                    axioms_options = {"p_axioms_class": 4.0, "p_axioms_macroclass": 1.0,
                                       "p_axioms_class_exists": 1.0, "p_axioms_class_cluster": 1.0, "p_all": 2.0}
 
                     if epoch >= 4:
-                        axioms_options = {"p_axioms_class": 2.0, "p_axioms_macroclass": 2.0,
+                        axioms_options = {"p_axioms_class": 4.0, "p_axioms_macroclass": 2.0,
                                           "p_axioms_class_exists": 2.0, "p_axioms_class_cluster": 2.0, "p_all": 2.0}
 
                     if epoch >= 8:
                         if opt.axioms_exists:
-                            axioms_options["p_axioms_class"] = 2.0
+                            axioms_options["p_axioms_class"] = 4.0
                             axioms_options["p_axioms_class_cluster"] = 4.0
                         if opt.weight_exists:
                             axioms_options["p_axioms_class_exists"] = 2.0
@@ -360,7 +345,7 @@ def main():
 
                     if epoch >= 12:
                         if opt.axioms_exists:
-                            axioms_options["p_axioms_class"] = 2.0
+                            axioms_options["p_axioms_class"] = 6.0
                             axioms_options["p_axioms_class_cluster"] = 6.0
                         if opt.weight_exists:
                             axioms_options["p_axioms_class_exists"] = 2.0
@@ -416,7 +401,7 @@ def main():
                                 """
 
                         if opt.cuda:
-                            cropped_images = cropped_images.to(torch.device("cuda:" + opt.gpu))
+                            cropped_images = cropped_images.cuda()
                         # print(datetime.now() - start_time)
 
                         pre_attri, boxes = model(cropped_images, attribute=attribute_seen, label=label_v,
@@ -488,7 +473,7 @@ def main():
                             loss_log[f] = list_axioms[f].value
 
                     # print(datetime.now() - start_time)
-                    optimizer.zero_grad()
+
                     loss.backward()
                     optimizer.step()
 
@@ -525,12 +510,11 @@ def main():
                 # logger.scalar_summary('Test ZSL loss', student_loss_ZSL, epoch+1)
                 if student_acc_ZSL > result_zsl_student.best_acc:
                     # save model state
-                    if opt.neptune_flag:
-                        model_save_path = os.path.join(
-                            weight_path + '/{}_{}__ZSL_id_{}.pth'.format(opt.experiment._experiments_stack[0], opt.dataset,
-                                                                         opt.train_id))
-                        torch.save(model.state_dict(), model_save_path)
-                        print('model saved to:', model_save_path)
+                    model_save_path = os.path.join(
+                        weight_path + '/{}_{}__ZSL_id_{}.pth'.format(opt.experiment._experiments_stack[0], opt.dataset,
+                                                                     opt.train_id))
+                    torch.save(model.state_dict(), model_save_path)
+                    print('model saved to:', model_save_path)
                 result_zsl_student.update(epoch + 1, student_acc_ZSL)
                 axioms_log["zsl"] += student_acc_ZSL
                 print('\n[Epoch {}] ZSL test accuracy is {:.1f}%, Best_acc [{:.1f}% | Epoch-{}]'.format(epoch + 1,

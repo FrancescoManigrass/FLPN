@@ -82,7 +82,7 @@ def get_opt():
 
     # for distributed loader
     parser.add_argument('--train_mode', type=str, default='random', help='loader: random or distributed or ltnsampler')
-    parser.add_argument('--n_batch', type=int, default=300, help='batch numbers per epoch')
+    parser.add_argument('--n_batch', type=int, default=1000, help='batch numbers per epoch')
     parser.add_argument('--false_negative', type=int, default=15, help='batch numbers per epoch')
     parser.add_argument('--ways', type=int, default=16, help='class numbers per episode')
     parser.add_argument('--shots', type=int, default=2, help='image numbers per class')
@@ -101,7 +101,7 @@ def get_opt():
     parser.add_argument('--only_evaluate', action='store_true', default=False)
     parser.add_argument('--resume', action='store_true', default=False)
     parser.add_argument('--resume_path',
-                        default='C:\\Users\\lab2O\\Documents\\Francesco Manigrasso\\polito\\flvn_official_extended\\out\\weight\\alpha\\pretrainepoch0_pretrainlr0.001_classifierlr0.001_16ways-2shots-1/Experiment(NEW-2871)_SUN__ZSL_id_0.pth',
+                        default='/media/grains6lab2/f/FLPN/out/weight/alpha/pretrainepoch4_pretrainlr0.0001_classifierlr1e-07_12ways-2shots-1/Experiment(NEW-2934)_AWA2__ZSL_id_0.pth',
                         help='weights resume missed')
 
     parser.add_argument('--neptune_flag', action='store_true', default=False)
